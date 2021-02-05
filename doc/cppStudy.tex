@@ -1,0 +1,447 @@
+
+\documentclass{article}
+
+\include{background/background}
+
+
+\title{C++ 学习笔记}
+\author{keepone}
+
+\begin{document}
+
+\maketitle
+\newpage 
+
+\tableofcontents \label{TABLE}
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{STL}
+\subsection{utility}
+\subsubsection{variant}
+
+
+\newpage 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{SFINAE}
+\subsection{简介}
+
+考虑如下的代码：
+
+\begin{minted}[bgcolor=bgColor_]{cpp}
+// header.h
+struct Bar {
+    typedef double internalType;  
+};
+
+template <typename T> 
+typename T::internalType foo(const T& t) { 
+    cout << "foo<T>\n"; 
+    return 0; 
+}
+
+// main.cpp
+int main() {
+    foo(Bar());
+    foo(0); // << error!
+}
+\end{minted}
+
+如果声明一个foo的重载函数，foo(0)就会编译通过。但是编译器在编译时，
+也只是看到了包含模板的头文件，并没有找到 foo 的重载，为什么没有报错。
+
+\mint[bgcolor=bgColor_]{cpp}{int foo(int i) { cout << "foo(int)\n"; return 0; }}
+
+\subsection{函数重载机制}
+\begin{itemize}
+    \item 名称查找，将找到所有模板与非模板函数。
+    \item 模板类型的推导，函数模板由实参推导而来。
+    \begin{itemize}
+        \item 推导模板的所有参数，包括返回类型及参数类型
+        \item 当推导失败时，将当前模板从函数重载集中删除，但并不会报错
+    \end{itemize}
+    \item 最终的函数重载集，这里会看到所有函数。
+    \item 选择最合适的函数
+\end{itemize}
+\subsection{使用场景}
+\subsection{std::enable\_if}
+\subsection{SFINAE}
+\subsection{缺点}
+\subsection{SNINAE替换方案}
+\subsubsection{Tag Dispatching}
+\subsubsection{c++17 的编译时 if}
+\subsubsection{c++20 的concepts}
+
+
+\subsection{io}
+\subsubsection{iomainip}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Template}
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Lambda}
+
+
+%============================================================
+\subsection{基本概念}
+
+%.............
+\subsubsection{Lambda 表达式的多种形式}
+\begin{minted}[bgcolor = bgColor_]{cpp}
+// default capture is copy 
+[]()[mutable] {}
+
+// copy capture = 
+[=]() [mutable] {use(title);}
+[t=title]() [mutable] { decltype(title) ... use(t);}
+[title]() [mutable] { decltype(title) ... use(title);}
+
+// reference capture &
+[&]() [mutable] {use(title);} // the most useful
+[&t=title]() [mutable] {use(t);}
+[&title]() [mutable] {use(title);}
+\end{minted}
+
+%.............
+\subsubsection{引用空悬}
+    \begin{itemize}
+        \item 向下（入栈）传递不会导致空悬。
+        \item 向上（出栈）、多线程交叉传递可能导致空悬。
+    \end{itemize}
+
+\begin{minted}[bgcolor = bgColor_]{cpp}
+// 函数 hasTitle 返回的 has_title_t 
+// 被向上传递到上层栈后，
+// 捕获 title 当前栈就会被销毁，title 被空悬。
+auto hasTitle(){
+    auto has_little_t = [&t=title](const Book& b){
+        return b.title() == t;
+    }
+    return has_title_t;    
+}
+\end{minted}
+
+%.............
+\subsubsection{引用捕获与拷贝捕获}
+kitten 的捕获发生在生调用时，此时 g=20，
+cat 的捕获发生在声明时，此时 g=10。
+
+\begin{minted}[bgcolor=bgColor_]{cpp}
+#include <stdio.h>
+int g = 10;
+auto kitten = [=](){return g+1;};
+auto cat = [g=g](){return g+1;};
+
+int main(){
+    g = 20;
+    printf("21 11\n", kitten(), cat());
+}
+\end{minted}
+
+%.............
+\subsubsection{局部静态变量}
+局部静态变量的行为相比于类的静态变量来理解
+\begin{minted}[bgcolor=bgColor_]{cpp}
+auto counter = [](){static int i; return ++i;};
+auto c1 = counter;
+auto c2 = counter;
+
+std::cout << c1() << c1() << c1(); // 1 2 3
+std::cout << c2() << c2() << c2(); // 4 5 6 
+\end{minted}
+
+
+%.............
+\subsubsection{拷贝与移动}
+Lambda 是否可以拷贝、是否可移动取决于它的捕获对象是否可拷贝、是否可移动。
+\begin{minted}[bgcolor=bgColor_]{cpp}
+// move only 
+std::unique_ptr<int> prop;
+
+// capture move only object
+auto lamb = [p=std::move(prop)](){};
+
+// 
+auto lamb2 = std::move(lamb);
+
+// error: call of implicitly-deleted copy constructor
+auto lamb3 = lamb; 
+\end{minted}
+
+
+%============================================================
+\subsection{高阶使用}
+
+%.............
+\subsubsection{各版本特性}
+\begin{itemize}
+    \item c++14 
+    \begin{itemize}
+        \item generic lambdas: pass auto argument, 
+            compiler expands to a function template
+        \item capture with initialiser: with this fiture you can 
+            capture not only existing variables from the other scope,
+            but also create new state variables for lambdas. This 
+            also allowed capturing moveable only types 
+    \end{itemize}
+    \item c++17
+    \begin{itemize}
+        \item constexpr lambdas: lambdas can work in a constexpr context.
+        \item capturing this improvements: capture *this by copy, avoiding
+            dangling when returning the lambda from a member function or 
+            store it
+    \end{itemize}
+    \item c++20
+    \begin{itemize}
+        \item template lambdas: improvements to generic lambdas which offers
+            move control over the input template argument
+        \item lambdas and concepts: lambdas can also work with constrained 
+            auto and concepts, so they are as flexible as functors as template functions 
+        \item lambdas in unevaluated contexts: can now create a map or a set 
+            and use a lambda as a predicate
+    \end{itemize}
+\end{itemize}
+
+
+%.............
+\subsubsection{捕获 this}
+Lambda 表达式中的 this 并不代表 lambda 表达式本身，而是代表定义它的那个
+定义域。下列 Widget 中的两个 this 都代表 Widget。
+\begin{minted}[bgcolor=bgColor_]{cpp}
+class Widget{
+    void work();
+    void synchronous_foo(){
+        this->work();
+    }
+    void asynchronous_foo(){
+        fire_and_front([=](){
+            this->work()
+        });
+    }
+};
+\end{minted} 
+
+捕获 this 的多种方式
+
+\begin{minted}[bgcolor=bgColor_]{cpp}
+// copy capture
+[=](){this->work();} // deprecated in c++20
+[this](){this->work();}
+[ptr=this](){ptr->work();}
+
+// reference capture
+[&](){this->work();}
+
+// new in c++17
+[*this](){this->work();}
+[obj=*this](){obj.work();}
+
+// by move
+[obj=std::move(*this)](){obj.work();}
+\end{minted} 
+    
+
+%.............
+\subsubsection{捕获变参}
+\begin{minted}[bgcolor=bgColor_]{cpp}
+// c++14/17 
+auto one = [](auto&& ... args){
+    return product(std::forward<decltype(args)>(args)...);
+}
+// c++20 perfect capture
+auto two = []<class... Ts>(Ts&&... args){
+    return product(std::forward<Ts>(args)...);
+}
+\end{minted} 
+
+
+%.............
+\subsubsection{Lambda 作为函数实参}
+\begin{minted}[bgcolor=bgColor_]{cpp}
+class Shelf{
+public:
+    template<class Func>
+    void for_each_book(Func f){
+        for(const Book& b : books_) f(b);
+    }
+}
+
+Shelf myshelf;
+myshelf.for_each_book([](auto && book){book.print();});
+\end{minted} 
+
+
+%.............
+\subsubsection{重载 Lambda}
+\begin{minted}[bgcolor=bgColor_]{cpp}
+#include <iostream>
+#include <type_traits>
+#include <functional>
+
+template<class F1, class... Fs>
+struct overload : F1, overload<Fs...>
+{
+    using F1::operator();
+    using overload<Fs...>::operator();
+    overload(F1 f1, Fs... fs) : F1(f1), overload<Fs...>(fs...) {}
+};
+
+template<class F1>
+struct overload<F1> : F1
+{
+    using F1::operator();
+    overload(F1 f1) : F1(f1) {}
+};
+
+
+template <class... F>
+auto make_overload(F... f) {
+    return overload<F...>(f...);
+}
+
+int main() {
+
+    std::function <int(int,int)> f = [](int x,int y) {
+        return x+y;
+    };
+    std::function <double(double,double)> g = [](double x,double y) {
+        return x+y;
+    };
+    std::function <std::string(std::string,std::string)> h = [](std::string x,std::string y) {
+        return x+y;
+    };
+
+    auto fgh = make_overload(f,g,h);
+    std::cout << fgh(1,2) << std::endl;
+    std::cout << fgh(1.5,2.5) << std::endl;
+    std::cout << fgh("bob","larry") << std::endl;
+}
+\end{minted}
+
+
+%.............
+\subsubsection{继承Lambda}
+\begin{minted}[bgcolor=bgColor_]{cpp}
+template<typename TFirst, typename... TRemaining>
+class FunctionSequence : public TFirst, FunctionSequence<TRemaining...>{
+public:
+    FunctionSequence(TFirst first, TRemaining... remaining)
+        : TFirst(first), FunctionSequence<TRemaining...>(remaining...)
+    {}
+
+    template<typename... Args>
+    decltype(auto) operator () (Args&&... args){
+        return FunctionSequence<TRemaining...>::operator()
+            (TFirst::operator()(std::forward<Arg>(args)...));
+    }
+};
+
+template<typename T>
+class FunctionSequence<T> : public T{
+    public:
+    FunctionSequence(T t) : T(t) {}
+    using T::operator();
+};
+
+template<typename... T>
+auto make_functionSequence(T... t){
+    return FunctionSequence<T...>(t...);
+}
+
+int main(){
+    //note: these lambda functions are bug ridden. Its just for simplicity here.
+    //For correct version, see the one on coliru, read on.
+    auto trimLeft = [](std::string& str) -> std::string& { 
+            str.erase(0, str.find_first_not_of(' ')); 
+            return str; 
+    };
+    auto trimRight = [](std::string& str) -> std::string& { 
+        str.erase(str.find_last_not_of(' ')+1); 
+        return str; 
+    };
+    auto capitalize = [](std::string& str) -> std::string& { 
+        for(auto& x : str) x = std::toupper(x); 
+        return str; }
+    ;
+
+    auto trimAndCapitalize = make_functionSequence(trimLeft, trimRight, capitalize);
+    std::string str = " what a Hullabaloo     ";
+
+    std::cout << "Before TrimAndCapitalize: str = \"" << str << "\"\n";
+    trimAndCapitalize(str);
+    std::cout << "After TrimAndCapitalize:  str = \"" << str << "\"\n";
+
+    return 0;
+}
+\end{minted}
+
+
+\begin{minted}[bgcolor=bgColor_]{cpp}
+#include <iostream>
+#include <type_traits>
+
+template<typename Lhs, typename Rhs>
+struct S : Lhs, Rhs{
+    S(Lhs lhs, Rhs rhs) : Lhs(lhs), Rhs(rhs) {}
+    using Lhs::operator();
+    using Rhs::operator();
+};
+
+template<typename Lhs, typename Rhs>
+auto make_combined(Lhs &&lhs, Rhs &&rhs){
+    return S<std::decay_t<Lhs>, std::decay_t<Rhs>>(
+        std::forward<Lhs>(lhs), std::forward<Rhs>(rhs)
+    );
+}
+
+int main(){
+    auto l1 = [](){return 3;};
+    auto l2 = [](int i){return i*10;};
+    auto combined = make_combined(l1, l2);
+    std::cout << combined() << std::endl;
+    std::cout << combined(3) << std::endl;
+    return 0;
+}
+\end{minted}
+
+%============================================================
+\subsection{Lambda vs Closure(闭包)}
+
+闭包是编程的一个概念，来自于函数式编程，c++中的 Lambda 表达式就是一种闭包。
+
+\mint[bgcolor=bgColor_]{cpp}{auto f = [&](int x, int y) {return x+y;};}
+
+\begin{itemize}
+    \item c++ Lambda是一个表达式，该表达式被编译后生成一个闭包以在运行时工作。
+    \item lambda 与闭包类似于类与类的实现，前者只存在于代码中，不存在于运行时。
+    \item 上式中的 f 并不是闭包，而是闭包的拷贝，闭包是一个临时量。如果要保存闭包，可以使用
+        万能引用实现，如下图所示。
+\end{itemize}
+
+\mint[bgcolor=bgColor_]{cpp}{auto f&& = [&](int x, int y) {return x+y;};}
+
+
+%============================================================
+\subsection{Lambda vs std::function}
+
+%.............
+\subsubsection{异同}
+\begin{itemize}
+    \item std::function 只能存储可拷贝对象，lambda 可存储任意对象
+    \item std::function 永远可以拷贝，lambda 的拷贝与移动性取决于其捕获对象的拷贝、移动性
+\end{itemize}
+
+%.............
+\subsubsection{传递成员函数}
+
+\end{document}
